@@ -1,0 +1,471 @@
+#+options: ':nil *:t -:t ::t <:t H:3 \n:nil ^:t arch:headline
+#+options: author:t broken-links:nil c:nil creator:nil
+#+options: d:(not "LOGBOOK") date:t e:t email:nil expand-links:t f:t
+#+options: inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
+#+options: tasks:t tex:t timestamp:t title:t toc:t todo:t |:t
+#+title: ziglang
+#+date: <2024-04-19 Fri>
+#+author: taocheng
+#+email: cn.taocheng@gmail.com
+#+language: en
+#+select_tags: export
+#+exclude_tags: noexport
+#+creator: Emacs 30.0.50 (Org mode 9.7-pre)
+#+cite_export:
+
+* 简介
+
+=Zig= 是一个用于维护和构建 =健壮= 、 =优化= 和 =可重用= 软件的工具链和编程语言。
+
+- 健壮 (Robust)
+- 优化 (Optimal)
+- 可重用 (Reusable)
+- 可维护 (Maintainable)
+
+* Hello World
+
+#+begin_src zig :tangle src/hello.zig
+const std = @import("std")
+
+pub fn main() !void {
+    const stdout = std.io.getStdOut().writer();
+    try stdout.print("Hello, {s}!\n", .{"world"});
+}
+#+end_src
+
+#+begin_src zig :tangle src/hello_again.zig
+  const std = @import("std");
+
+  pub fn main() void {
+      std.debug.print("Hello, world!\n", .{});
+  }
+#+end_src
+
+* Comments
+
+#+begin_src zig :tangle src/comments.zig
+  const print = @import("std").debug.print;
+
+  pub fn main() void {
+      // Comments in Zig start with "//" and end at the next LF byte (end of line).
+      // The line below is a comment and won't be executed.
+
+      // print("Hello?", .{});
+
+      print("Hello, world!\n", .{});
+  }
+#+end_src
+
+** Doc Comments
+
+#+begin_src zig :tangle src/doc_comments.zig
+  /// A structure for storing a timestamp, with nanosecond precision (this is a
+  /// mutiline doc comment).
+  const Timestamp = struct {
+      /// The number of seconds since the epoch (this is also a doc comment).
+      seconds: i64,
+      /// The number of nanoseconds past the seconds (doc comment again).
+      nanos: u32,
+
+      /// Returns a `Timestamp` struct representing the Unix epoch; that is, the
+      /// moment of 1970 Jan 1 00:00:00 UTC (this is a doc comment too).
+      pub fn unixEpoch() Timestamp {
+          return Timestamp{
+              .seconds = 0,
+              .nanos = 0,
+          };
+      }
+  };
+#+end_src
+
+#+begin_src zig :tangle src/invalid_doc-comment.zig
+  /// doc-comment
+  //! top-level doc-comment
+  const std = @import("std");
+#+end_src
+
+#+begin_src zig :tangle src/unattached_doc-comment.zig
+  pub fn main() void {
+  }
+
+  /// End of file
+#+end_src
+
+** Top-Level Doc Comments
+
+#+begin_src zig :tangle src/tldoc_comments.zig
+  //! This module provides functions for retrieving the current date and
+  //! time with varying degrees of precsion and accuracy. It does not
+  //! depend on libc, but will use functions from it if available.
+
+  const S = struct {
+      //! Top level comments are allowed inside a container other than a module,
+      //! but it is not very useful. Currently, when producing the package
+      //! documentation, these comments are ignored.
+  };
+#+end_src
+
+* Values
+
+#+begin_src zig :tangle src/values.zig
+  // Top-level declarations are order-independent:
+  const print = std.debug.print;
+  const std = @import("std");
+  const os = std.os;
+  const assert = std.debug.assert;
+
+  pub fn main() void {
+      // integers
+      const one_plus_one: i32 = 1 + 1;
+      print("1 + 1 = {}\n", .{one_plus_one});
+
+      // floats
+      const seven_div_three: f32 = 7.0 / 3.0;
+      print("7.0 / 3/0 = {}\n", .{seven_div_three});
+
+      // boolean
+      print("{}\n{}\n{}\n", .{
+          true and false,
+          true or false,
+          !true,
+      });
+
+      // optional
+      var optional_value: ?[]const u8 = null;
+      assert(optional_value == null);
+
+      print("\noptional 1\ntype: {}\nvalue: {?s}\n", .{
+          @TypeOf(optional_value), optional_value,
+      });
+
+      optional_value = "hi";
+      assert(optional_value != null);
+
+      print("\noptional 2\ntype: {}\nvalue: {?s}\n", .{
+          @TypeOf(optional_value), optional_value,
+      });
+
+      // error union
+      var number_or_error: anyerror!i32 = error.ArgNotFound;
+
+      print("\nerror union 1\ntype: {}\nvalue: {!}\n", .{
+          @TypeOf(number_or_error), number_or_error, });
+
+      number_or_error = 1234;
+
+      print("\nerror union 2\ntype: {}\nvalue: {!}\n", .{
+          @TypeOf(number_or_error), number_or_error, });
+  }
+#+end_src
+
+* String Literals and Unicode Code Point Literals
+
+#+begin_src zig :tangle src/string_literals.zig
+  const print = @import("std").debug.print;
+  const mem = @import("std").mem; // will be used to compare bytes
+
+  pub fn main() void {
+      const bytes = "hello";
+      print("{}\n", .{@TypeOf(bytes)}); // *const [5:0]u8
+      print("{d}\n", .{bytes.len}); // 5
+      print("{c}\n", .{bytes[1]}); // 'e'
+      print("{d}\n", .{bytes[5]}); // 0
+      print("{}\n", .{'e' == '\x65'}); // true
+      print("{d}\n", .{'\u{1f4a9}'}); // 128169
+      print("{d}\n", .{'💯'}); // 128175
+      print("{u}\n", .{'⚡'});
+      print("{}\n", .{mem.eql(u8, "hello", "h\x65llo")}); //true
+      print("{}\n", .{mem.eql(u8, "💯", "\xf0\x9f\x92\xaf")}); // also true
+      const invalid_utf8 = "\xff\xfe"; // non-UTF-8 strings are possible with \xNN notation.
+      print("0x{x}\n", .{invalid_utf8[1]}); // indexing them returns individual bytes ...
+      print("0x{x}\n", .{"💯"[1]}); // ... as does indexing part-way through non-ASCII characters
+  }
+#+end_src
+
+** Mutiline String Literals
+
+#+begin_src zig :tangle src/mutiline_string_literals.zig
+  const hello_world_in_c =
+      \\#include <stdio.h>
+      \\
+      \\int main(int argc, char **argv) {
+      \\    printf("hello world\n");
+      \\    return 0;
+      \\}
+  ;
+#+end_src
+
+** Assignment
+
+#+begin_src zig :tangle src/constant_identifier_cannot_change.zig
+  const x = 1234;
+
+  fn foo() void {
+      // It works at file scope as well as inside functions.
+      const y = 5678;
+
+      // Once assigned, an identifiers cannot be changed.
+      y += 1;
+  }
+
+  pub fn main() void {
+      foo();
+  }
+#+end_src
+
+#+begin_src zig :tangle src/mutable_var.zig
+  const print = @import("std").debug.print;
+
+  pub fn main() void {
+      var y: i32 = 5678;
+
+      y += 1;
+
+      print("{d}", .{y});
+  }
+#+end_src
+
+#+begin_src zig :tangle src/var_must_be_initialized.zig
+  pub fn main() void {
+      var x: i32;
+
+      x = 1;
+  }
+#+end_src
+
+** undefined
+
+#+begin_src zig :tangle src/assign_undefined.zig
+  const print = @import("std").debug.print;
+
+  pub fn main() void {
+      var x: i32 = undefined;
+      x = 1;
+      print("{d}", .{x});
+  }
+#+end_src
+
+#+begin_src zig :tangle src/testing_introduction.zig
+  const std = @import("std");
+
+  test "expect addOne adds one to 41" {
+
+      // The Standard Library contains useful functions to help create tests.
+      // `expect` is a function that verifies its arguments is true.
+      // It will return an error if its argument is false to indicate a failure.
+      // `try` is used to return an error to the test runner to notify it that the test failed.
+      try std.testing.expect(addOne(41) == 42);
+  }
+
+  test addOne {
+      // A test name can alse be written using an identifier.
+      // This is a doctest, and servers as documentation for `addOne`.
+      try std.testing.expect(addOne(41) == 42);
+  }
+
+  /// The function `addOne` adds one to the number given as its argument.
+  fn addOne(number: i32) i32 {
+      return number + 1;
+  }
+#+end_src
+
+** Test Failure
+
+#+begin_src zig :tangle src/testing_failure.zig
+  const std = @import("std");
+
+  test "expect this to fail" {
+      try std.testing.expect(false);
+  }
+
+  test "expect this to succees" {
+      try std.testing.expect(true);
+  }
+#+end_src
+
+** Skip Tests
+
+#+begin_src zig :tangle src/testing_skip.zig
+  test "this will be skipped" {
+      return error.SkipZigTest;
+  }
+#+end_src
+
+** Report Memory Leaks
+
+#+begin_src zig :tangle src/testing_detect_leak.zig
+  const std = @import("std");
+
+  test "detect leak" {
+      var list = std.ArrayList(u21).init(std.testing.allocator);
+      // missing `defer list.deinie();`
+      try list.append('☔');
+
+      try std.testing.expect(list.items.len == 1);
+  }
+#+end_src
+
+
+** Detecting Test Build
+
+#+begin_src zig src/testing_detect_test.zig
+  const std = @import("std");
+  const builtin = @import("builtin");
+  const expect = std.testing.expect;
+
+  test "builtin.is_test" {
+      try expect(isATest());
+  }
+
+  fn isATest() bool {
+      return builtin.is_test;
+  }
+#+end_src
+
+** Test Output and Logging
+
+#+begin_src zig :tangle src/testing_namespace.zig
+  const std = @import("std");
+
+  test "expectEqual demo" {
+      const expected: i32 = 42;
+      const actual = 42;
+
+      // The first argument to `expectEqual` is the known, expected, result.
+      // The second argument is the result of some expression.
+      // The actual's type is casted to the type of expected.
+      try std.testing.expectEqual(expected, actual);
+  }
+
+  test "expectError demo" {
+      const expected_error = error.DemoError;
+      const actual_error_union: anyerror!void = error.DemoError;
+
+      // `expectError` will fail when the actual error is different than
+      // the expected error.
+  }
+#+end_src
+
+* Variables
+
+** Identitiers
+
+#+begin_src zig :tangle src/identifiers.zig
+  const @"identifier with space in it" = 0xff;
+  const @"1SmallStep4Man" = 112358;
+
+  const c = @import("std").c;
+  pub extern "c" fn @"error"() void;
+  pub extern "c" fn @"fstat$INODE64"(fd: c.fd_t, buf: *c.Stat) c_int;
+
+  const Color = enum {
+      red,
+      @"really red",
+  };
+  const color: Color = .@"really red";
+#+end_src
+
+** Container Level Variables
+
+#+begin_src zig :tangle src/test_container_level_variables.zig
+  var y: i32 = add(10, x);
+  const x: i32 = add(12, 34);
+
+  test "container level variables" {
+      try expect(x == 46);
+      try expect(y == 56);
+  }
+
+  fn add(a: i32, b: i32) i32 {
+      return a + b;
+  }
+
+  const std = @import("std");
+  const expect = std.testing.expect;
+#+end_src
+
+#+begin_src zig :tangle src/test_namespaces_container_level_variable.zig
+  const std = @import("std");
+  const expect = std.testing.expect;
+
+  test "namespaced container level variable" {
+      try expect(foo() == 1235);
+      try expect(foo() == 1236);
+  }
+
+  const S = struct {
+      var x: i32 = 1234;
+  };
+
+  fn foo() i32 {
+      S.x += 1;
+      return S.x;
+  }
+#+end_src
+
+** Static Local Variables
+
+#+begin_src zig :tangle src/test_static_local_variable.zig
+  const std = @import("std");
+  const expect = std.testing.expect;
+
+  test "static local variable" {
+      try expect(foo() == 1235);
+      try expect(foo() == 1236);
+  }
+
+  fn foo() i32 {
+      const S = struct {
+          var x: i32 = 1234;
+      };
+      S.x += 1;
+      return S.x;
+  }
+#+end_src
+
+** Thread Local Variables
+
+#+begin_src zig :tangle src/test_thread_local_variables.zig
+  const std = @import("std");
+  const assert = std.debug.assert;
+
+  threadlocal var x: i32 = 1234;
+
+  test "thread local storage" {
+      const thread1 = try std.Thread.spawn(.{}, testTls, .{});
+      const thread2 = try std.Thread.spawn(.{}, testTls, .{});
+      testTls();
+      thread1.join();
+      thread2.join();
+  }
+
+  fn testTls() void {
+      assert(x == 1234);
+      x += 1;
+      assert(x == 1235);
+  }
+#+end_src
+
+** Local Variables
+
+#+begin_src zig :tangle src/test_comptime_variables.zig
+  const std = @import("std");
+  const expect = std.testing.expect;
+
+  test "comptime vars" {
+      var x: i32 = 1;
+      comptime var y: i32 = 1;
+
+      x += 1;
+      y += 1;
+
+      try expect(x == 2);
+      try expect(y == 2);
+
+      if (y != 2) {
+          // This compile error never triggers beacause y is a comptime variable,
+          // and so `y != 2` is a comptime value, and this if is statically evaluated.
+          @compileError("wrong y value");
+      }
+  }
+#+end_src
